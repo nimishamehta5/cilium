@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	operatorOption "github.com/cilium/cilium/operator/option"
@@ -112,7 +113,13 @@ func enableUnmanagedController(ctx context.Context, wg *sync.WaitGroup, clientse
 								}
 
 								log.WithField(logfields.K8sPodName, podID).Infof("Restarting unmanaged pod, started %s ago", age)
-								if err := clientset.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{}); err != nil {
+								eviction := &policyv1beta1.Eviction{
+									ObjectMeta: metav1.ObjectMeta{
+										Name:      pod.Name,
+										Namespace: pod.Namespace,
+									},
+								}
+								if err := clientset.PolicyV1beta1().Evictions(pod.Namespace).Evict(ctx, eviction); err != nil {
 									log.WithError(err).WithField(logfields.K8sPodName, podID).Warning("Unable to restart pod")
 								} else {
 									lastPodRestart[podID] = time.Now()
